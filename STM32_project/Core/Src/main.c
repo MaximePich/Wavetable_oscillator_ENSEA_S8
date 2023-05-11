@@ -34,9 +34,11 @@
 #include "drv/analog.h"
 #include "drv/eeprom.h"
 
-
 #include "dsp/dsp.h"
 #include "dsp/wave.h"
+
+//TODOs
+//Handle multiple modes wavetable/wavemixer/calibration with the encoder push button.
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -102,6 +104,7 @@ h_dsp_t h_dsp = {
 
 static eeprom_save_t eeprom_save;
 
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -162,19 +165,28 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 
     encoder_process(&h_encoder);
 		read_switch();
+    //Process analog inputs
+    //Params (Potentiometers and encoder)
+    uint16_t x_param        = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_X_PARAM_INDEX);
+    uint16_t y_param        = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_Y_PARAM_INDEX);
+    uint16_t x_attv_param   = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_X_ATTV_INDEX);
+    uint16_t y_attv_param   = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_Y_ATTV_INDEX);
+    int32_t encoder         = encoder_value(&h_encoder);
+    h_dsp.params[X_PARAM]       = x_param;
+    h_dsp.params[Y_PARAM]       = y_param;
+    h_dsp.params[X_ATTV_PARAM]  = x_attv_param;
+    h_dsp.params[Y_ATTV_PARAM]  = y_attv_param;
+    h_dsp.params[PITCH_PARAM]   = encoder;
 
-    uint16_t x_param = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_X_PARAM_INDEX);
-    uint16_t y_param = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_Y_PARAM_INDEX);
-    uint16_t pitch = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_PITCH_INPUT_INDEX);  // C0 = 2V = 2376LSB ; C2 = 4V = 2814LSB
-    int32_t encoder = encoder_value(&h_encoder);
-
-    h_dsp.params[PITCH_PARAM] = encoder;
-
-    h_dsp.params[X_PARAM] = x_param;
-    h_dsp.params[Y_PARAM] = y_param;
+    //Inputs (IN jacks)
+    uint16_t x_in     = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_X_INPUT_INDEX);
+    uint16_t y_in     = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_Y_INPUT_INDEX); 
+    uint16_t pitch    = 4095 - analog_get_adc(&h_analog, ANALOG_ADC_PITCH_INPUT_INDEX);  // C0 = 2V = 2376LSB ; C2 = 4V = 2814LSB
+    h_dsp.inputs[X_INPUT] = x_in;
+    h_dsp.inputs[Y_INPUT] = y_in;
     h_dsp.inputs[PITCH_INPUT] = pitch;
-    h_dsp.inputs[X_INPUT] = 0;
-    h_dsp.inputs[Y_INPUT] = 0;
+
+
 
     led_pwm_set_brightness(&h_led_red, x_param >> 4);
     led_pwm_set_brightness(&h_led_green, encoder + 127);
@@ -273,14 +285,14 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  // TODO
+  /* TODO
   // We want to be able to calibrate the v/oct input
   // If encoder is pressed, enter calibration mode
   // Blink one color (eg. blue) while calibrating, say 1V (C2)
   // Waits second encoder press
   // We might light green LED for 1 or 2 seconds to send feedback to the user
   // Blink another color (eg. red) while calibrating, say 3V (C4)
-
+  */
   eeprom_read((void*)&eeprom_save, sizeof(eeprom_save_t));
   printf("Encoder value: %ld\r\n", eeprom_save.encoder);
   encoder_set(&h_encoder, eeprom_save.encoder);
@@ -297,15 +309,10 @@ int main(void)
     }
 #endif // DEBUG_ENCODER
 
-    float voct_sub = 2376.f;
-    float voct_div = (2814.f - 2376.f) / 2.f;
-    float voct = ((float)(h_dsp.inputs[PITCH_INPUT]) - voct_sub) / voct_div;
-    float blblbl = (voct - (int)voct) * 1000;
+    //printf( "X_in= %ld    |  Y_in= %ld\r\n", h_dsp.inputs[X_INPUT], h_dsp.inputs[Y_INPUT]);
+    printf("Xatt_pot= %ld | Yatt_pot= %ld\r\n\r\n", h_dsp.params[X_ATTV_PARAM], h_dsp.params[Y_ATTV_PARAM]);
 
-    //printf("ADC = %ld, V/oct = %d.%03d\r\n", h_dsp.inputs[PITCH_INPUT], (int)voct, (int)blblbl);
-    //printf("X= %f | Y= %f\r\n", analog_to_minus1_to_1(h_dsp.params[X_PARAM]), analog_to_minus1_to_1(h_dsp.params[Y_PARAM]));
-    
-    HAL_Delay(1000);
+    //HAL_Delay(1000);
    
 
     /* USER CODE END WHILE */
@@ -378,6 +385,8 @@ void Error_Handler(void)
 
   while (1)
   {
+    //printf("Error\r\n, HAL error code: %ld\r\n", HAL_GetError());
+    HAL_Delay(1000);
   }
   /* USER CODE END Error_Handler_Debug */
 }

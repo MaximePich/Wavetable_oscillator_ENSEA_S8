@@ -22,6 +22,8 @@ typedef enum dsp_param_id_enum
     PITCH_PARAM, /**< Identifier for the pitch parameter. */
     X_PARAM, /**< Identifier for the X parameter. */
     Y_PARAM, /**< Identifier for the Y parameter. */
+    X_ATTV_PARAM, /**< Identifier for the X attenuation parameter. */
+    Y_ATTV_PARAM, /**< Identifier for the Y attenuation parameter. */
     PARAMS_LEN /**< Length of the parameter array. */
 } dsp_param_id_t;
 

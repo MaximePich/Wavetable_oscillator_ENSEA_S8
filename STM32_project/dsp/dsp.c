@@ -3,8 +3,18 @@
 #include "math.h"
 
 float analog_to_minus1_to_1(uint16_t analog)
-{
-    return (float)(analog - 2048) / 2048.f;
+{  
+    float val = (float)(analog - 2048) / 2048.f;
+    if (val>1)
+    {
+        return 1.f;
+    }else if (val<-1)
+    {
+        return -1.f;
+    }else
+    {
+        return val;
+    }
 }
 
 void normalize_to_line_tension(uint32_t *buffer, float multiplier)
@@ -42,32 +52,34 @@ void dsp_init(h_dsp_t * h_dsp)
 void dsp_process(h_dsp_t * h_dsp, uint32_t * dac_buffer, int32_t dac_buffer_size)
 {
     // Compute pitch voltage
-    float pitch = (float)(h_dsp->params[PITCH_PARAM])/12.f;
+    float pitch = (float)(h_dsp->params[PITCH_PARAM])/12.f;//encoder base pitch
+
     // C0 = 2V = 2376LSB ; C2 = 4V = 2814LSB
     float voct_sub = 2376.f;                    // Compensate the offset
     float voct_div = (2814.f - 2376.f) / 2.f;   // Compensate the gain
     float voct = ((float)(h_dsp->inputs[PITCH_INPUT]) - voct_sub) / voct_div;
     pitch += voct;
-    // TODO add h_dsp->inputs[PITCH_INPUT]
-    // TODO clamp
 
     // Compute oscillator frequency
     h_dsp->frequency = FREQ_C4 * pow(2.f, pitch); // Not sure about that either
 
     // Compute X and Y voltages
-    float X = analog_to_minus1_to_1(h_dsp->params[X_PARAM]);
-    float Y = analog_to_minus1_to_1(h_dsp->params[Y_PARAM]);
+    int32_t X_param = h_dsp->params[X_PARAM];
+    int32_t Y_param = h_dsp->params[Y_PARAM];
+    float X_att = (float)(h_dsp->params[X_ATTV_PARAM]) / 4096.f;
+    float Y_att = (float)(h_dsp->params[Y_ATTV_PARAM]) / 4096.f;
 
-    
     // Transfered from 0 to DAC_BUFFER_SIZE/2 - 1
     for (int it = 0 ; it < dac_buffer_size ; it++)
     {
+        //Mix X and Y params with the input modifiers
+        float X = analog_to_minus1_to_1(X_param+(h_dsp->inputs[X_INPUT]*X_att));
+        float Y = analog_to_minus1_to_1(Y_param+(h_dsp->inputs[Y_INPUT]*Y_att));
+
         // Accumulate the phase
         h_dsp->phase += h_dsp->frequency / h_dsp->sample_frequency;
         if (h_dsp->phase >= 1.f) h_dsp->phase -= 1.f;
 
-
-        //uint16_t index = (uint16_t)(h_dsp->phase * 4096);
 
         //phase varies between 0 and 1 for one buffer cycle
         float w1,w2,w3,w4;
